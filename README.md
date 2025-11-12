@@ -7,8 +7,11 @@
 
 📦 korea-population 폴더 구조
 ┣ 📂 data --- .csv 파일
+
 ┣ 📂 html --- .html, .css 파일
+
 ┣ 📂 python --- .py 파일
+
 ┗ 📄 README.md
 
  🚀 주요 기능
