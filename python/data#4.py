@@ -30,8 +30,6 @@ plt.figure(figsize=(15, 4))
 plt.xticks(rotation=60)
 sns.lineplot(data = df, x="연도 (년)", y="추계인구(명)")
 
-df
-
 plt.figure(figsize=(15, 4))
 plt.xticks(rotation=60)
 sns.pointplot(data = df, x="연도 (년)", y="출생자수(명)")
