@@ -2,113 +2,122 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>인구 데이터 시각화</title>
+  <title>CSV Chart Viewer</title>
 
+  <!-- Chart.js & PapaParse -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <!-- Webfont (한글 깨짐 방지) -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      padding: 20px;
+    }
+    canvas {
+      max-width: 1000px;
+      margin-top: 25px;
+    }
+  </style>
 </head>
+
 <body>
-  <h1>한국 인구 데이터 시각화</h1>
+  <h2>📊 CSV 그래프 시각화</h2>
 
-  <h2>파이 차트 (예: 지역별 인구 비율)</h2>
-  <canvas id="pieChart" width="400" height="400"></canvas>
+  <label>CSV 선택: </label>
+  <select id="csvSelect"></select>
+  <button onclick="loadCSV()">불러오기</button>
+  <br><br>
 
-  <h2>선 그래프 (예: 연도별 인구 변화)</h2>
-  <canvas id="lineChart" width="800" height="400"></canvas>
+  <label>X축 :</label>
+  <select id="xColumn"></select>
 
-  <script>
-    //실제 raw CSV URL. 테스트 때마다 수정 필요
-    const csvUrl = "https://raw.githubusercontent.com/Scanning-PKNU/korea-population/main/data/hawsun_person_data.csv";
+  <label>Y축 :</label>
+  <select id="yColumn"></select>
 
-    fetch(csvUrl)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error("CSV 파일을 가져오는 데 실패했습니다: " + response.status);
+  <label>그래프 :</label>
+  <select id="chartType">
+    <option value="bar">Bar</option>
+    <option value="line">Line</option>
+    <option value="pie">Pie</option>
+  </select>
+
+  <button onclick="drawChart()">차트 출력</button>
+
+  <canvas id="myChart"></canvas>
+
+<script>
+
+  const baseRepo = "https://api.github.com/repos/Scanning-PKNU/korea-population/contents/data/";
+  const rawBase = "https://raw.githubusercontent.com/Scanning-PKNU/korea-population/main/";
+
+  let rows = [];
+  let chart = null;
+
+  // ⭐ 깃허브에서 CSV 파일 자동 목록 로딩
+  fetch(baseRepo)
+    .then(res => res.json())
+    .then(files => {
+      const csvFiles = files.filter(f => f.name.endsWith(".csv"));
+      document.getElementById("csvSelect").innerHTML =
+        `<option value="">선택...</option>` +
+        csvFiles.map(f => `<option value="${f.path}">${f.name}</option>`).join("");
+    });
+
+  // ⭐ CSV 파일 로드
+  function loadCSV() {
+    const file = document.getElementById("csvSelect").value;
+    if (!file) return alert("CSV 파일을 선택하세요!");
+
+    Papa.parse(rawBase + file, {
+      download: true,
+      header: true,
+      encoding: "UTF-8",
+      complete: function(result) {
+        rows = result.data.filter(r => Object.keys(r).length > 1);
+
+        const headers = Object.keys(rows[0]);
+        document.getElementById("xColumn").innerHTML = headers.map(h => `<option value="${h}">${h}</option>`).join("");
+        document.getElementById("yColumn").innerHTML = headers.map(h => `<option value="${h}">${h}</option>`).join("");
+
+        alert("CSV 불러오기 완료!");
+      }
+    });
+  }
+
+  // ⭐ 차트 출력
+  function drawChart() {
+    const xKey = document.getElementById("xColumn").value;
+    const yKey = document.getElementById("yColumn").value;
+    const type = document.getElementById("chartType").value;
+
+    const labels = rows.map(r => r[xKey]);
+    const values = rows.map(r => Number(String(r[yKey]).replace(/,/g, "")));
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(document.getElementById("myChart"), {
+      type: type,
+      data: {
+        labels: labels,
+        datasets: [{
+          label: `${xKey} 대비 ${yKey}`,
+          data: values,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        plugins: { legend: { labels: { font: { family: "Noto Sans KR" } } } },
+        scales: {
+          x: { ticks: { font: { family: "Noto Sans KR" } } },
+          y: { ticks: { font: { family: "Noto Sans KR" } } }
         }
-        return response.text();
-      })
-      .then(csvText => {
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          complete: function(results) {
-            const rows = results.data;
-            console.log(rows);
+      }
+    });
+  }
+</script>
 
-            // 필드명은 CSV 실제 컬럼명으로
-            const labelFieldForPie = "법정동명";
-            const valueFieldForPie = "총인원수";
-
-            const labelFieldForLine = "연도";
-            const valueFieldForLine = "총인원수";
-            
-            // 파이차트 데이터 구성
-            const pieLabels = rows.map(r => r[labelFieldForPie]);
-            const pieValues = rows.map(r => Number(r[valueFieldForPie]));
-
-            new Chart(document.getElementById("pieChart"), {
-              type: "pie",
-              data: {
-                labels: pieLabels,
-                datasets: [{
-                  data: pieValues,
-                  backgroundColor: pieLabels.map((_, idx) => `hsl(${idx * 360 / pieLabels.length}, 70%, 50%)`)
-                }]
-              },
-              options: {
-                responsive: true,
-                plugins: {
-                  legend: {
-                    position: 'right'
-                  }
-                }
-              }
-            });
-
-            // 선그래프 데이터 구성
-            const lineLabels = rows.map(r => r[labelFieldForLine]);
-            const lineValues = rows.map(r => Number(r[valueFieldForLine]));
-
-            new Chart(document.getElementById("lineChart"), {
-              type: "line",
-              data: {
-                labels: lineLabels,
-                datasets: [{
-                  label: valueFieldForLine,
-                  data: lineValues,
-                  borderColor: 'blue',
-                  fill: false
-                }]
-              },
-              options: {
-                responsive: true,
-                scales: {
-                  x: {
-                    title: {
-                      display: true,
-                      text: labelFieldForLine
-                    }
-                  },
-                  y: {
-                    title: {
-                      display: true,
-                      text: valueFieldForLine
-                    }
-                  }
-                }
-              }
-            });
-
-          },
-          error: function(err) {
-            console.error("CSV 파싱 중 오류 발생:", err);
-          }
-        });
-      })
-      .catch(err => {
-        console.error("Fetch 에러:", err);
-      });
-
-  </script>
 </body>
 </html>
